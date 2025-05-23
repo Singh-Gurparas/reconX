@@ -5,130 +5,148 @@ from bs4 import BeautifulSoup
 from ipwhois import IPWhois
 import json
 import socket
+from colorama import init, Fore, Style
+import time
 
-# Function to get WHOIS info of the target
+init(autoreset=True)
+
+# Typing effect
+def type_effect(text, color=Fore.WHITE, delay=0.01):
+    for char in text:
+        print(color + char, end='', flush=True)
+        time.sleep(delay)
+    print()
+
+# Banner
+def print_banner():
+    print(Fore.RED + Style.BRIGHT + r"""
+░▒▓███████▓▒░░▒▓████████▓▒░▒▓██████▓▒░ ░▒▓██████▓▒░░▒▓███████▓▒░░▒▓█▓▒░░▒▓█▓▒░ 
+░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░     ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░ 
+░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░     ░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░ 
+░▒▓███████▓▒░░▒▓██████▓▒░░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░░▒▓██████▓▒░  
+░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░     ░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░ 
+░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░     ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░ 
+░▒▓█▓▒░░▒▓█▓▒░▒▓████████▓▒░▒▓██████▓▒░ ░▒▓██████▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░ 
+    """)
+    print(Fore.RED + Style.DIM + "              ⚠ INTELLIGENCE GATHERING MODULE ⚠\n")
+
+def section_title(title):
+    print(Fore.LIGHTBLACK_EX + "─" * 60)
+    print(Fore.YELLOW + Style.BRIGHT + f"[+] {title}")
+    print(Fore.LIGHTBLACK_EX + "─" * 60)
+
 def get_whois_info(domain):
     try:
-        w = whois.whois(domain)
-        return w
+        return whois.whois(domain)
     except Exception as e:
-        return f"Error fetching WHOIS info: {str(e)}"
+        return f"ERROR: {str(e)}"
 
-# Function to get subdomains of a domain by scraping crt.sh
 def get_subdomains(domain):
     url = f"https://crt.sh/?q=%25.{domain}"
-    response = requests.get(url)
-    
-    if response.status_code != 200:
-        return f"Error fetching subdomains: {response.status_code}"
-    
-    soup = BeautifulSoup(response.text, "html.parser")
-    
-    subdomains = set()
-    for td in soup.find_all("td"):
-        text = td.get_text().strip()
-        if text.endswith(domain):
-            subdomains.add(text)
-    
-    return subdomains
+    try:
+        response = requests.get(url)
+        soup = BeautifulSoup(response.text, "html.parser")
+        return {td.get_text().strip() for td in soup.find_all("td") if td.get_text().strip().endswith(domain)}
+    except Exception as e:
+        return f"ERROR: {str(e)}"
 
-# Function to get DNS information (resolves to an IP)
 def get_dns_info(domain):
     try:
-        ip = socket.gethostbyname(domain)
-        return ip
-    except socket.gaierror:
-        return "DNS resolution failed"
+        return socket.gethostbyname_ex(domain)[2]  # List of IPs
+    except Exception:
+        return []
 
-# Function to get IP geolocation information using ipwhois
 def get_ip_geolocation(ip):
     try:
-        ipwhois = IPWhois(ip)
-        result = ipwhois.lookup_rdap()
-        return result
+        return IPWhois(ip).lookup_rdap()
     except Exception as e:
-        return f"Error fetching geolocation info: {str(e)}"
+        return f"ERROR: {str(e)}"
 
-# Function to search Shodan for information on the target IP or domain
-def get_shodan_info(api_key, target):
+def get_shodan_info(api_key, target_ip):
     try:
-        api = shodan.Shodan(api_key)
-        result = api.host(target)
-        return result
+        return shodan.Shodan(api_key).host(target_ip)
     except shodan.APIError as e:
-        return f"Error fetching Shodan data: {e}"
+        return f"ERROR: {e}"
 
-# Placeholder function to fetch social media info (can be expanded later)
 def get_social_media_info(target):
-    # Use APIs like Tweepy for Twitter or Facebook Graph API for actual scraping.
-    return {"twitter": f"Twitter profile for {target}", "linkedin": f"LinkedIn profile for {target}"}
+    return {
+        "Twitter" : f"https://twitter.com/{target}",
+        "LinkedIn": f"https://linkedin.com/in/{target}"
+    }
 
-# Function to format the output cleanly
-def print_section_title(title):
-    print(f"\n{'-'*40}")
-    print(f"{title}")
-    print(f"{'-'*40}")
+def perform_recon(target, shodan_api_key=None, show_banner=True):
+    if show_banner:
+        print_banner()
 
-# Main function to run reconnaissance on a target (domain or IP)
-def perform_recon(target, shodan_api_key=None):
-    print(f"\n[+] Performing reconnaissance on: {target}")
-    
-    # WHOIS Info
-    print_section_title("[+] WHOIS Info")
-    whois_info = get_whois_info(target)
-    if isinstance(whois_info, str):
-        print(whois_info)
+    type_effect(f"Original Target ➤ {target}", Fore.GREEN)
+
+    section_title("WHOIS Information")
+    whois_data = get_whois_info(target)
+    if isinstance(whois_data, dict) or hasattr(whois_data, 'items'):
+        try:
+            items = whois_data.items() if hasattr(whois_data, 'items') else whois_data.__dict__.items()
+            for key, value in items:
+                print(Fore.GREEN + f"├ {key:<18}: " + Fore.LIGHTWHITE_EX + f"{value}")
+        except Exception:
+            print(Fore.RED + "Failed to parse WHOIS data")
     else:
-        for key, value in whois_info.items():
-            print(f"{key}: {value}")
-    
-    # Subdomain Enumeration
-    print_section_title("[+] Subdomains")
+        print(Fore.RED + whois_data)
+
+    section_title("Subdomain Enumeration")
     subdomains = get_subdomains(target)
-    if isinstance(subdomains, set) and subdomains:
-        for sub in subdomains:
-            print(f" - {sub}")
+    if isinstance(subdomains, set):
+        for i, sub in enumerate(subdomains, start=1):
+            print(Fore.CYAN + f"↳ Subdomain {i}: {sub}")
     else:
-        print("No subdomains found or error retrieving them.")
-    
-    # DNS Info
-    print_section_title("[+] DNS Info")
-    dns_info = get_dns_info(target)
-    if dns_info != "DNS resolution failed":
-        print(f" - IP Address: {dns_info}")
-    else:
-        print(dns_info)
-    
-    # IP Geolocation
-    ip = get_dns_info(target)
-    print_section_title("[+] IP Geolocation Info")
-    if ip != "DNS resolution failed":
-        geolocation = get_ip_geolocation(ip)
-        print(json.dumps(geolocation, indent=4))
-    else:
-        print("No IP geolocation data available.")
+        print(Fore.RED + subdomains)
 
-    # Shodan Info (if Shodan API key is provided)
-    if shodan_api_key:
-        print_section_title("[+] Shodan Info")
-        shodan_info = get_shodan_info(shodan_api_key, ip)
-        if isinstance(shodan_info, dict):
-            print(json.dumps(shodan_info, indent=4))
-        else:
-            print(shodan_info)
-
-    # Social Media Info
-    print_section_title("[+] Social Media Info")
-    social_media_info = get_social_media_info(target)
-    if social_media_info:
-        for key, value in social_media_info.items():
-            print(f" - {key}: {value}")
+    section_title("DNS Lookup")
+    ips = get_dns_info(target)
+    if ips:
+        for i, ip in enumerate(ips, start=1):
+            print(Fore.GREEN + f"↳ IP Address {i}: {ip}")
     else:
-        print("No social media information found.")
+        print(Fore.RED + "DNS resolution failed")
 
-# Example Usage
+    section_title("IP Geolocation")
+    if ips:
+        for ip in ips:
+            geo = get_ip_geolocation(ip)
+            if isinstance(geo, dict):
+                net = geo.get("network", {})
+                print(Fore.YELLOW + f"\n↳ Geolocation Info for {ip}:")
+
+                print(Fore.CYAN + f"  ASN            : " + Fore.WHITE + f"{geo.get('asn', 'N/A')}")
+                print(Fore.CYAN + f"  ASN Registry   : " + Fore.WHITE + f"{geo.get('asn_registry', 'N/A')}")
+                print(Fore.CYAN + f"  Country Code   : " + Fore.WHITE + f"{geo.get('asn_country_code', 'N/A')}")
+                print(Fore.CYAN + f"  ASN CIDR       : " + Fore.WHITE + f"{geo.get('asn_cidr', 'N/A')}")
+                print(Fore.CYAN + f"  ASN Org        : " + Fore.WHITE + f"{geo.get('asn_description', 'N/A')}")
+                print(Fore.CYAN + f"  Net Handle     : " + Fore.WHITE + f"{net.get('handle', 'N/A')}")
+                print(Fore.CYAN + f"  Net Status     : " + Fore.WHITE + f"{', '.join(net.get('status', [])) if net.get('status') else 'N/A'}")
+            else:
+                print(Fore.RED + f"  Error: {geo}")
+    else:
+        print(Fore.RED + "Skipping geolocation (no IPs found).")
+
+    if shodan_api_key and ips:
+        section_title("Shodan Intelligence")
+        for ip in ips:
+            shodan_info = get_shodan_info(shodan_api_key, ip)
+            if isinstance(shodan_info, dict):
+                print(Fore.YELLOW + f"\n↳ Shodan Info for {ip}:")
+                print(Fore.LIGHTWHITE_EX + json.dumps(shodan_info, indent=4))
+            else:
+                print(Fore.RED + f"  Error: {shodan_info}")
+
+    section_title("Social Media Links")
+    for platform, link in get_social_media_info(target).items():
+        print(Fore.MAGENTA + f"↳ {platform}: " + Fore.LIGHTWHITE_EX + link)
+
+    print(Fore.LIGHTGREEN_EX + Style.BRIGHT + "\n[✔] Recon complete. All data secured.")
+
 if __name__ == "__main__":
-    shodan_api_key = "API_KEY"  # Replace with your own Shodan API key
-    target = input("Enter the target domain or IP: ")  # Get input from the user
-
-    perform_recon(target, shodan_api_key)
+    shodan_api_key = "API_KEY"  # Add your Shodan API key here
+    print_banner()
+    print(Fore.CYAN + Style.BRIGHT + "\nEnter a target (domain/IP) below.\n")
+    target = input(Fore.LIGHTGREEN_EX + "[?] Target: ")
+    perform_recon(target, shodan_api_key, show_banner=False)
