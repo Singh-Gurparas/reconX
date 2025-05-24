@@ -1,0 +1,6 @@
+requests
+whois
+shodan
+beautifulsoup4
+ipwhois
+colorama
