@@ -25,6 +25,13 @@
 
 ---
 
+## Screenshot
+
+Here is a screenshot showing the script in action:
+
+![reconX](img/reconX.png)
+
+
 ## 📦 Installation
 
 Clone the repository and install dependencies:
